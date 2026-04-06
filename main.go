@@ -27,17 +27,17 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr        string
-		probeAddr          string
-		enableLeaderElect  bool
-		serviceAccountName string
+		metricsAddr           string
+		probeAddr             string
+		enableLeaderElect     bool
+		jobServiceAccountName string
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "Address for the metrics endpoint.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "Address for health probes.")
 	flag.BoolVar(&enableLeaderElect, "leader-elect", false, "Enable leader election for high availability.")
-	flag.StringVar(&serviceAccountName, "service-account-name", "kmeteor-controller-manager",
-		"ServiceAccount name the operator runs as; scheduled jobs will use the same account.")
+	flag.StringVar(&jobServiceAccountName, "job-service-account-name", "kmeteor-job",
+		"ServiceAccount assigned to scheduled CronJobs; controls their RBAC independently of the operator.")
 
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
@@ -63,7 +63,7 @@ func main() {
 	if err = (&controller.KMeteorReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
-		ServiceAccountName: serviceAccountName,
+		JobServiceAccountName: jobServiceAccountName,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "KMeteor")
 		os.Exit(1)

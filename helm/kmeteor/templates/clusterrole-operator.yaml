@@ -1,11 +1,11 @@
----
-# Cluster-scoped permission to manage the CRD itself (needed to list/watch across namespaces).
+# Fixed ClusterRole for the operator — manages KMeteor CRs and CronJobs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kmeteor-manager-role
+  name: {{ include "kmeteor.fullname" . }}-operator
+  labels:
+    {{- include "kmeteor.labels" . | nindent 4 }}
 rules:
-  # KMeteor CRD
   - apiGroups: ["kmeteor.io"]
     resources: ["kmeteors"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -15,14 +15,12 @@ rules:
   - apiGroups: ["kmeteor.io"]
     resources: ["kmeteors/finalizers"]
     verbs: ["update"]
-  # CronJobs (namespace-scoped but listed via ClusterRole for simplicity)
   - apiGroups: ["batch"]
     resources: ["cronjobs"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["get", "list", "watch"]
-  # Events
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "patch"]

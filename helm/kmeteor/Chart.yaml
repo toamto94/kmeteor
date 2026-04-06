@@ -1,0 +1,12 @@
+apiVersion: v2
+name: kmeteor
+description: Kubernetes operator that schedules random events as a Poisson process
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - operator
+  - poisson
+  - chaos
+maintainers:
+  - name: toamto

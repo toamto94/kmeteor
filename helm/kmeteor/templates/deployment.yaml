@@ -1,29 +1,30 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kmeteor-controller-manager
-  namespace: kmeteor-system
+  name: {{ include "kmeteor.fullname" . }}
+  namespace: {{ .Values.namespace }}
   labels:
-    app: kmeteor-controller-manager
+    {{- include "kmeteor.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: kmeteor-controller-manager
+      {{- include "kmeteor.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: kmeteor-controller-manager
+        {{- include "kmeteor.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: kmeteor-controller-manager
+      serviceAccountName: {{ .Values.operatorServiceAccount.name }}
       securityContext:
         runAsNonRoot: true
       containers:
         - name: manager
-          image: ghcr.io/toamto/kmeteor:latest
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - --service-account-name=kmeteor-controller-manager
-            - --leader-elect=false
+            - --job-service-account-name={{ .Values.jobServiceAccount.name }}
+            - --leader-elect={{ .Values.leaderElection }}
           ports:
             - name: metrics
               containerPort: 8080
@@ -46,9 +47,4 @@ spec:
             capabilities:
               drop: ["ALL"]
           resources:
-            limits:
-              cpu: 500m
-              memory: 128Mi
-            requests:
-              cpu: 10m
-              memory: 64Mi
+            {{- toYaml .Values.resources | nindent 12 }}

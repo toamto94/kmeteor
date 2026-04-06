@@ -25,9 +25,10 @@ const ownerLabel = "kmeteor.io/owner"
 type KMeteorReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	// ServiceAccountName is the name of the ServiceAccount the operator itself runs as.
-	// Scheduled CronJobs will use this same account so they inherit its RBAC.
-	ServiceAccountName string
+	// JobServiceAccountName is the ServiceAccount assigned to scheduled CronJobs.
+	// It is distinct from the operator's own ServiceAccount so that job RBAC can
+	// be scoped independently (e.g. via the Helm chart's jobRbac values).
+	JobServiceAccountName string
 }
 
 //+kubebuilder:rbac:groups=kmeteor.io,resources=kmeteors,verbs=get;list;watch;create;update;patch;delete
@@ -169,8 +170,8 @@ func (r *KMeteorReconciler) createCronJob(ctx context.Context, km *kmeteoriov1al
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
-							// Use the operator's ServiceAccount so jobs inherit its RBAC.
-							ServiceAccountName: r.ServiceAccountName,
+							// Use the dedicated job ServiceAccount (configured via Helm jobRbac).
+							ServiceAccountName: r.JobServiceAccountName,
 							RestartPolicy:      corev1.RestartPolicyNever,
 							Containers: []corev1.Container{
 								{

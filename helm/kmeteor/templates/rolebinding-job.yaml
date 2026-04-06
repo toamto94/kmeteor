@@ -1,0 +1,32 @@
+{{- if .Values.jobRbac.clusterScoped }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kmeteor.fullname" . }}-job
+  labels:
+    {{- include "kmeteor.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kmeteor.fullname" . }}-job
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.jobServiceAccount.name }}
+    namespace: {{ .Values.namespace }}
+{{- else }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kmeteor.fullname" . }}-job
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kmeteor.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "kmeteor.fullname" . }}-job
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.jobServiceAccount.name }}
+    namespace: {{ .Values.namespace }}
+{{- end }}

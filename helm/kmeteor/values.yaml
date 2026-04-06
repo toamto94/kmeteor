@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/toamto/kmeteor
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# ServiceAccount the operator pod itself runs as.
+# Its RBAC is fixed (manage KMeteors + CronJobs) and not user-configurable.
+operatorServiceAccount:
+  name: kmeteor-controller-manager
+
+# ServiceAccount assigned to every CronJob spawned by the operator.
+# Kept separate from the operator SA so job permissions can be scoped freely.
+jobServiceAccount:
+  name: kmeteor-job
+
+# ── CronJob RBAC ────────────────────────────────────────────────────────────
+# Configure what permissions the scheduled CronJobs have.
+#
+# clusterScoped: true  → creates a ClusterRole  + ClusterRoleBinding
+#                false → creates a Role         + RoleBinding
+#                        (limited to the namespace where the CR lives)
+#
+# rules: standard Kubernetes RBAC policy rules appended to the role.
+#        By default the list is empty — the CronJob pod just prints "fired"
+#        and needs no cluster access.
+#
+# Example — allow CronJobs to list and delete Pods:
+#   jobRbac:
+#     clusterScoped: false
+#     rules:
+#       - apiGroups: [""]
+#         resources: ["pods"]
+#         verbs: ["get", "list", "delete"]
+# ────────────────────────────────────────────────────────────────────────────
+jobRbac:
+  clusterScoped: false
+  rules: []
+
+leaderElection: false
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+# Namespace the operator is deployed into.
+# The CRD and ClusterRole(Binding) are cluster-scoped regardless.
+namespace: kmeteor-system
