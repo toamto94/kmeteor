@@ -1,0 +1,9 @@
+apiVersion: kmeteor.io/v1alpha1
+kind: KMeteor
+metadata:
+  name: example
+  namespace: default
+spec:
+  # On average 3 events per hour, inter-arrival times ~ Exp(3/hour)
+  lambda: 3
+  interval: 1h
