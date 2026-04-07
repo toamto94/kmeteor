@@ -6,7 +6,7 @@ metadata:
 spec:
   # On average 3 events per hour, inter-arrival times ~ Exp(3/hour)
   lambda: 3
-  interval: 1h
+  interval: 10m
 
   # Chaos actions — one is selected at random per scheduled event, weighted by `weight`.
   # The job ServiceAccount must have RBAC permissions matching each action's kubectl calls.

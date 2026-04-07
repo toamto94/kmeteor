@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/toamto/kmeteor
+  repository: kmeteor
   tag: "latest"
-  pullPolicy: IfNotPresent
+  pullPolicy: Never
 
 # ServiceAccount the operator pod itself runs as.
 # Its RBAC is fixed (manage KMeteors + CronJobs) and not user-configurable.
