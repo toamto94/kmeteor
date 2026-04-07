@@ -26,13 +26,109 @@ jobServiceAccount:
 #        By default the list is empty — the CronJob pod just prints "fired"
 #        and needs no cluster access.
 #
-# Example — allow CronJobs to list and delete Pods:
+# ── Chaos profiles ──────────────────────────────────────────────────────────
+# Each profile below shows the jobRbac.rules required for the matching
+# ChaosAction entries you put in the KMeteor CR spec.actions field.
+# The blast radius is strictly bounded by what RBAC allows.
+#
+# Profile A — pod-chaos (namespace-scoped)
+#   Deletes a random running Pod; tests workload self-healing.
 #   jobRbac:
 #     clusterScoped: false
 #     rules:
 #       - apiGroups: [""]
 #         resources: ["pods"]
 #         verbs: ["get", "list", "delete"]
+#
+#   KMeteor CR spec.actions entry:
+#     - name: delete-random-pod
+#       image: bitnami/kubectl:latest
+#       weight: 1
+#       command:
+#         - sh
+#         - -c
+#         - |
+#           kubectl get pods --field-selector=status.phase=Running -o name \
+#             | shuf -n1 | xargs -r kubectl delete --grace-period=0 --force
+#
+# Profile B — deployment-chaos (namespace-scoped)
+#   Scales a random Deployment to 0; tests HPA / alert coverage.
+#   jobRbac:
+#     clusterScoped: false
+#     rules:
+#       - apiGroups: ["apps"]
+#         resources: ["deployments"]
+#         verbs: ["get", "list", "patch", "update"]
+#
+#   KMeteor CR spec.actions entry:
+#     - name: scale-deployment-zero
+#       image: bitnami/kubectl:latest
+#       weight: 1
+#       command:
+#         - sh
+#         - -c
+#         - |
+#           kubectl get deployments -o name | shuf -n1 \
+#             | xargs -r sh -c 'kubectl scale "$1" --replicas=0' --
+#
+# Profile C — configmap-chaos (namespace-scoped)
+#   Injects a stale key into a random ConfigMap; tests config-reload handling.
+#   jobRbac:
+#     clusterScoped: false
+#     rules:
+#       - apiGroups: [""]
+#         resources: ["configmaps"]
+#         verbs: ["get", "list", "patch"]
+#
+#   KMeteor CR spec.actions entry:
+#     - name: corrupt-configmap
+#       image: bitnami/kubectl:latest
+#       weight: 1
+#       command:
+#         - sh
+#         - -c
+#         - |
+#           CM=$(kubectl get configmaps -o name | grep -v kube-root-ca | shuf -n1)
+#           [ -n "$CM" ] && kubectl patch $CM --type=merge \
+#             -p "{\"data\":{\"chaos\":\"$(date -u +%FT%TZ)\"}}"
+#
+# Profile D — networkpolicy-chaos (namespace-scoped)
+#   Deletes a random NetworkPolicy; tests whether missing policies open unwanted paths.
+#   jobRbac:
+#     clusterScoped: false
+#     rules:
+#       - apiGroups: ["networking.k8s.io"]
+#         resources: ["networkpolicies"]
+#         verbs: ["get", "list", "delete"]
+#
+#   KMeteor CR spec.actions entry:
+#     - name: delete-networkpolicy
+#       image: bitnami/kubectl:latest
+#       weight: 1
+#       command:
+#         - sh
+#         - -c
+#         - |
+#           kubectl get networkpolicies -o name | shuf -n1 | xargs -r kubectl delete
+#
+# Profile E — node-chaos (cluster-scoped)
+#   Cordons a random node; tests pod eviction and rescheduling.
+#   jobRbac:
+#     clusterScoped: true
+#     rules:
+#       - apiGroups: [""]
+#         resources: ["nodes"]
+#         verbs: ["get", "list", "patch"]
+#
+#   KMeteor CR spec.actions entry:
+#     - name: cordon-random-node
+#       image: bitnami/kubectl:latest
+#       weight: 1
+#       command:
+#         - sh
+#         - -c
+#         - |
+#           kubectl get nodes -o name | shuf -n1 | xargs -r kubectl cordon
 # ────────────────────────────────────────────────────────────────────────────
 jobRbac:
   clusterScoped: false

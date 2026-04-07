@@ -7,3 +7,29 @@ spec:
   # On average 3 events per hour, inter-arrival times ~ Exp(3/hour)
   lambda: 3
   interval: 1h
+
+  # Chaos actions — one is selected at random per scheduled event, weighted by `weight`.
+  # The job ServiceAccount must have RBAC permissions matching each action's kubectl calls.
+  # See helm/kmeteor/values.yaml for the matching jobRbac.rules per profile.
+  actions:
+    # Deletes a random running Pod (weight 2 → twice as likely as the scale action).
+    - name: delete-random-pod
+      image: bitnami/kubectl:latest
+      weight: 2
+      command:
+        - sh
+        - -c
+        - |
+          kubectl get pods --field-selector=status.phase=Running -o name \
+            | shuf -n1 | xargs -r kubectl delete --grace-period=0 --force
+
+    # Scales a random Deployment to 0 replicas.
+    - name: scale-deployment-zero
+      image: bitnami/kubectl:latest
+      weight: 1
+      command:
+        - sh
+        - -c
+        - |
+          kubectl get deployments -o name | shuf -n1 \
+            | xargs -r sh -c 'kubectl scale "$1" --replicas=0' --

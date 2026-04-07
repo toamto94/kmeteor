@@ -38,6 +38,46 @@ spec:
           spec:
             description: KMeteorSpec defines the desired state of KMeteor.
             properties:
+              actions:
+                description: |-
+                  Actions is the list of chaos workloads the controller may schedule.
+                  Each CronJob event picks one action at random, weighted by Weight.
+                  If empty, the job falls back to printing "fired" (no-op useful for testing).
+                items:
+                  description: ChaosAction defines a single chaos workload executed by a scheduled CronJob.
+                  properties:
+                    args:
+                      description: Args are additional arguments passed to Command.
+                      items:
+                        type: string
+                      type: array
+                    command:
+                      description: Command is the entrypoint for the chaos container.
+                      items:
+                        type: string
+                      minItems: 1
+                      type: array
+                    image:
+                      description: Image is the container image used to execute the chaos command.
+                      type: string
+                    name:
+                      description: Name is a human-readable label for this action (used in logs and events).
+                      type: string
+                    weight:
+                      default: 1
+                      description: |-
+                        Weight controls the relative selection probability when multiple actions are
+                        defined. A higher value increases the chance of this action being chosen.
+                        Defaults to 1.
+                      format: int32
+                      minimum: 1
+                      type: integer
+                  required:
+                  - command
+                  - image
+                  - name
+                  type: object
+                type: array
               interval:
                 description: |-
                   Interval is the time window over which Lambda events are expected on average.

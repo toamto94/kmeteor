@@ -143,12 +143,58 @@ func timeToCronSchedule(t time.Time) string {
 	return fmt.Sprintf("%d %d %d %d *", t.Minute(), t.Hour(), t.Day(), int(t.Month()))
 }
 
-// createCronJob creates a one-shot CronJob that fires at time t and prints "fired".
+// selectAction picks one ChaosAction from the list using weighted random selection.
+// Actions with a higher Weight are proportionally more likely to be chosen.
+// Weight values less than 1 are treated as 1.
+func selectAction(actions []kmeteoriov1alpha1.ChaosAction) kmeteoriov1alpha1.ChaosAction {
+	total := 0
+	for _, a := range actions {
+		w := a.Weight
+		if w < 1 {
+			w = 1
+		}
+		total += w
+	}
+	pick := rand.Intn(total)
+	cumulative := 0
+	for _, a := range actions {
+		w := a.Weight
+		if w < 1 {
+			w = 1
+		}
+		cumulative += w
+		if pick < cumulative {
+			return a
+		}
+	}
+	return actions[len(actions)-1]
+}
+
+// createCronJob creates a one-shot CronJob that fires at time t.
+// If the KMeteor CR has Actions defined, one is selected at random (weighted).
+// Otherwise the job falls back to printing "fired" (no-op / safe default).
 func (r *KMeteorReconciler) createCronJob(ctx context.Context, km *kmeteoriov1alpha1.KMeteor, name string, t time.Time) error {
 	schedule := timeToCronSchedule(t)
 
 	successLimit := int32(1)
 	failedLimit := int32(1)
+
+	var container corev1.Container
+	if len(km.Spec.Actions) > 0 {
+		action := selectAction(km.Spec.Actions)
+		container = corev1.Container{
+			Name:    "event",
+			Image:   action.Image,
+			Command: action.Command,
+			Args:    action.Args,
+		}
+	} else {
+		container = corev1.Container{
+			Name:    "event",
+			Image:   "busybox:latest",
+			Command: []string{"sh", "-c", `echo "fired"`},
+		}
+	}
 
 	cj := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -173,13 +219,7 @@ func (r *KMeteorReconciler) createCronJob(ctx context.Context, km *kmeteoriov1al
 							// Use the dedicated job ServiceAccount (configured via Helm jobRbac).
 							ServiceAccountName: r.JobServiceAccountName,
 							RestartPolicy:      corev1.RestartPolicyNever,
-							Containers: []corev1.Container{
-								{
-									Name:    "event",
-									Image:   "busybox:latest",
-									Command: []string{"sh", "-c", `echo "fired"`},
-								},
-							},
+							Containers:         []corev1.Container{container},
 						},
 					},
 				},

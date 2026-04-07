@@ -10,11 +10,37 @@ import (
 
 // DeepCopyInto copies all properties of this object into another object of the
 // same type that is provided as a pointer.
+func (in *ChaosAction) DeepCopyInto(out *ChaosAction) {
+	*out = *in
+	if in.Command != nil {
+		in, out := &in.Command, &out.Command
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Args != nil {
+		in, out := &in.Args, &out.Args
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+}
+
+// DeepCopy returns a deep copy of this ChaosAction.
+func (in *ChaosAction) DeepCopy() *ChaosAction {
+	if in == nil {
+		return nil
+	}
+	out := new(ChaosAction)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto copies all properties of this object into another object of the
+// same type that is provided as a pointer.
 func (in *KMeteor) DeepCopyInto(out *KMeteor) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Spec = in.Spec
+	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 }
 
@@ -73,6 +99,13 @@ func (in *KMeteorList) DeepCopy() *KMeteorList {
 // same type that is provided as a pointer.
 func (in *KMeteorSpec) DeepCopyInto(out *KMeteorSpec) {
 	*out = *in
+	if in.Actions != nil {
+		in, out := &in.Actions, &out.Actions
+		*out = make([]ChaosAction, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 }
 
 // DeepCopy returns a deep copy of this KMeteorSpec.
