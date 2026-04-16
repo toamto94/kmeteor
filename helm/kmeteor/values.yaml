@@ -134,6 +134,25 @@ jobRbac:
   clusterScoped: false
   rules: []
 
+# ── Multi-tenancy ────────────────────────────────────────────────────────────
+# When enabled, a ClusterRole is created that grants KMeteor CR management
+# permissions. Bind it per-namespace with a RoleBinding to give tenants access
+# without touching the operator namespace.
+#
+# Tenants must:
+#   1. Create a ServiceAccount + Role + RoleBinding in their own namespace
+#      for the chaos job pod (the SA they reference in spec.jobServiceAccountName).
+#   2. Deploy their KMeteor CR with spec.jobServiceAccountName pointing to that SA.
+#
+# Example RoleBinding for a tenant namespace:
+#   kubectl create rolebinding kmeteor-tenant \
+#     --clusterrole=kmeteor-tenant \
+#     --serviceaccount=<tenant-ns>:<tenant-user> \
+#     --namespace=<tenant-ns>
+# ─────────────────────────────────────────────────────────────────────────────
+tenantAccess:
+  enabled: false
+
 leaderElection: false
 
 resources:

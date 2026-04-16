@@ -179,6 +179,12 @@ func (r *KMeteorReconciler) createCronJob(ctx context.Context, km *kmeteoriov1al
 	successLimit := int32(1)
 	failedLimit := int32(1)
 
+	// Prefer the per-CR SA (tenant override) over the operator-level default.
+	jobSA := r.JobServiceAccountName
+	if km.Spec.JobServiceAccountName != "" {
+		jobSA = km.Spec.JobServiceAccountName
+	}
+
 	var container corev1.Container
 	if len(km.Spec.Actions) > 0 {
 		action := selectAction(km.Spec.Actions)
@@ -217,7 +223,7 @@ func (r *KMeteorReconciler) createCronJob(ctx context.Context, km *kmeteoriov1al
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							// Use the dedicated job ServiceAccount (configured via Helm jobRbac).
-							ServiceAccountName: r.JobServiceAccountName,
+							ServiceAccountName: jobSA,
 							RestartPolicy:      corev1.RestartPolicyNever,
 							Containers:         []corev1.Container{container},
 						},

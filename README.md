@@ -19,6 +19,7 @@ Instead of firing incidents at fixed intervals ("every hour, delete a pod"), kme
   - [Built-in profiles](#built-in-profiles)
   - [Weighted selection](#weighted-selection)
 - [Installation](#installation)
+- [Multi-tenancy](#multi-tenancy)
 - [Configuration reference](#configuration-reference)
 - [CR reference](#cr-reference)
 
@@ -277,6 +278,107 @@ kubectl logs -n kmeteor-system deployment/kmeteor-controller-manager -f
 
 ---
 
+## Multi-tenancy
+
+In a multi-tenant cluster, tenants have no access to the operator namespace but can deploy KMeteor CRs into their own namespaces and define their own chaos scope.
+
+### Security model
+
+The key guarantee is that a tenant's CronJob pods run under a **ServiceAccount the tenant owns**, in their own namespace. The operator never creates that SA — it just references it. This means:
+
+- A tenant cannot exceed the permissions of their own SA — privilege escalation is impossible by construction.
+- Tenant A's blast radius is completely independent of Tenant B's.
+- The cluster admin controls which tenants get access to the KMeteor API at all, via RoleBindings.
+
+### Setup (cluster admin)
+
+**1. Enable the tenant ClusterRole in the Helm chart:**
+
+```bash
+helm upgrade kmeteor ./helm/kmeteor --set tenantAccess.enabled=true
+```
+
+This creates a `ClusterRole` named `kmeteor-tenant` that grants `create/get/list/watch/update/patch/delete` on `kmeteors.kmeteor.io`.
+
+**2. Bind it per tenant namespace — never cluster-wide:**
+
+```bash
+kubectl create rolebinding kmeteor-tenant \
+  --clusterrole=kmeteor-tenant \
+  --serviceaccount=<tenant-ns>:<tenant-user> \
+  --namespace=<tenant-ns>
+```
+
+Using a `RoleBinding` (not `ClusterRoleBinding`) means the tenant can only manage KMeteor CRs in their own namespace.
+
+### Setup (tenant)
+
+**1. Create a ServiceAccount and Role for the chaos job pods:**
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-chaos-sa
+  namespace: <tenant-ns>
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: my-chaos-role
+  namespace: <tenant-ns>
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: my-chaos-rolebinding
+  namespace: <tenant-ns>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: my-chaos-role
+subjects:
+  - kind: ServiceAccount
+    name: my-chaos-sa
+    namespace: <tenant-ns>
+```
+
+**2. Deploy a KMeteor CR referencing that SA:**
+
+```yaml
+apiVersion: kmeteor.io/v1alpha1
+kind: KMeteor
+metadata:
+  name: my-chaos
+  namespace: <tenant-ns>
+spec:
+  lambda: 2
+  interval: 1h
+  jobServiceAccountName: my-chaos-sa   # <── tenant's own SA
+  actions:
+    - name: delete-random-pod
+      image: bitnami/kubectl:latest
+      weight: 1
+      command:
+        - sh
+        - -c
+        - |
+          kubectl get pods --field-selector=status.phase=Running -o name \
+            | shuf -n1 | xargs -r kubectl delete --grace-period=0 --force
+```
+
+The operator schedules CronJobs in `<tenant-ns>` using `my-chaos-sa`. The blast radius is exactly what `my-chaos-role` allows — nothing else.
+
+### What the operator's own SA does NOT need
+
+The operator already has `create/list/watch/delete` on `CronJobs` cluster-wide (required to manage CRs in any namespace). It does **not** need any new permissions to support multi-tenancy — it simply passes the tenant-provided SA name through to the CronJob spec.
+
+---
+
 ## Configuration reference
 
 All values in `helm/kmeteor/values.yaml`:
@@ -290,6 +392,7 @@ All values in `helm/kmeteor/values.yaml`:
 | `jobServiceAccount.name` | `kmeteor-job` | SA assigned to every CronJob pod |
 | `jobRbac.clusterScoped` | `false` | `true` → ClusterRole, `false` → Role |
 | `jobRbac.rules` | `[]` | RBAC policy rules for the job SA |
+| `tenantAccess.enabled` | `false` | Create the `kmeteor-tenant` ClusterRole for per-namespace RoleBindings |
 | `leaderElection` | `false` | Enable leader election (set `true` for multi-replica) |
 | `resources.limits.cpu` | `500m` | CPU limit for the operator pod |
 | `resources.limits.memory` | `128Mi` | Memory limit for the operator pod |
@@ -308,6 +411,9 @@ metadata:
 spec:
   lambda: 3                # Average number of events per interval
   interval: 1h             # Length of each scheduling window (Go duration string)
+  jobServiceAccountName: my-chaos-sa  # Optional. Overrides the operator default SA.
+                                      # Must exist in the CR's namespace.
+                                      # Use this in multi-tenant clusters.
   actions:                 # Optional. If empty, CronJobs print "fired" (no-op).
     - name: my-action      # Human-readable label shown in logs
       image: bitnami/kubectl:latest
