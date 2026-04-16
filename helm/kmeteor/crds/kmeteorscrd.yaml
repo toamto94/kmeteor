@@ -78,6 +78,14 @@ spec:
                   - name
                   type: object
                 type: array
+              jobServiceAccountName:
+                description: |-
+                  JobServiceAccountName overrides the operator-level default ServiceAccount
+                  assigned to CronJob pods. Set this in multi-tenant clusters so that each
+                  KMeteor CR runs under a tenant-owned SA in the CR's own namespace.
+                  The SA must already exist in the same namespace as the KMeteor CR.
+                  If unset, the operator's configured default SA is used.
+                type: string
               interval:
                 description: |-
                   Interval is the time window over which Lambda events are expected on average.

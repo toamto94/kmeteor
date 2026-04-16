@@ -44,6 +44,14 @@ type KMeteorSpec struct {
 	// If empty, the job falls back to printing "fired" (a no-op useful for testing).
 	// +optional
 	Actions []ChaosAction `json:"actions,omitempty"`
+
+	// JobServiceAccountName overrides the operator-level default ServiceAccount
+	// assigned to CronJob pods. Set this in multi-tenant clusters so that each
+	// KMeteor CR runs under a tenant-owned SA in the CR's own namespace.
+	// The SA must already exist in the same namespace as the KMeteor CR.
+	// If unset, the operator's configured default SA is used.
+	// +optional
+	JobServiceAccountName string `json:"jobServiceAccountName,omitempty"`
 }
 
 // KMeteorStatus defines the observed state of KMeteor.

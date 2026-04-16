@@ -1,0 +1,23 @@
+{{- if .Values.tenantAccess.enabled }}
+# ClusterRole that grants a tenant the ability to manage KMeteor CRs in their
+# own namespace. Bind it with a RoleBinding (not ClusterRoleBinding) so the
+# permissions are scoped to a single namespace:
+#
+#   kubectl create rolebinding kmeteor-tenant \
+#     --clusterrole={{ include "kmeteor.fullname" . }}-tenant \
+#     --serviceaccount=<tenant-ns>:<tenant-sa> \
+#     --namespace=<tenant-ns>
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kmeteor.fullname" . }}-tenant
+  labels:
+    {{- include "kmeteor.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["kmeteor.io"]
+    resources: ["kmeteors"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["kmeteor.io"]
+    resources: ["kmeteors/status"]
+    verbs: ["get"]
+{{- end }}
