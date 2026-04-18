@@ -20,8 +20,12 @@ var indexHTML []byte
 
 // Strike is one scheduled chaos event returned by the API.
 type Strike struct {
-	Name     string    `json:"name"`
-	FireTime time.Time `json:"fireTime"`
+	Name       string    `json:"name"`
+	FireTime   time.Time `json:"fireTime"`
+	ActionName string    `json:"actionName,omitempty"`
+	Image      string    `json:"image,omitempty"`
+	Command    []string  `json:"command,omitempty"`
+	Args       []string  `json:"args,omitempty"`
 }
 
 // KMeteorInfo is the API response shape for a single KMeteor CR.
@@ -105,12 +109,19 @@ func (s *Server) handleStrikes(w http.ResponseWriter, r *http.Request) {
 			client.MatchingLabels{"kmeteor.io/owner": km.Name},
 		); err == nil {
 			for _, cj := range cjList.Items {
-				if ft := parseCronSchedule(cj.Spec.Schedule); ft != nil {
-					info.Strikes = append(info.Strikes, Strike{
-						Name:     cj.Name,
-						FireTime: *ft,
-					})
+				ft := parseCronSchedule(cj.Spec.Schedule)
+				if ft == nil {
+					continue
 				}
+				strike := Strike{Name: cj.Name, FireTime: *ft}
+				if containers := cj.Spec.JobTemplate.Spec.Template.Spec.Containers; len(containers) > 0 {
+					c := containers[0]
+					strike.Image = c.Image
+					strike.Command = c.Command
+					strike.Args = c.Args
+					strike.ActionName = matchActionName(km.Spec.Actions, c.Image, c.Command)
+				}
+				info.Strikes = append(info.Strikes, strike)
 			}
 		}
 
@@ -122,6 +133,29 @@ func (s *Server) handleStrikes(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// matchActionName returns the action name from the KMeteor spec whose image and
+// command match the given values, or empty string if no match is found.
+func matchActionName(actions []kmeteoriov1alpha1.ChaosAction, image string, command []string) string {
+	for _, a := range actions {
+		if a.Image == image && sliceEqual(a.Command, command) {
+			return a.Name
+		}
+	}
+	return ""
+}
+
+func sliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // parseCronSchedule interprets the one-shot cron format "M H D Month *"

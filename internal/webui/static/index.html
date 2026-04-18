@@ -209,21 +209,30 @@
       margin-bottom: 0.55rem;
     }
 
+    .strike-item { margin-bottom: 0.35rem; }
+
     .strike-row {
       display: flex;
       align-items: center;
       gap: 0.6rem;
       padding: 0.5rem 0.75rem;
-      margin-bottom: 0.35rem;
       border-radius: 6px;
       background: rgba(255, 106, 0, 0.05);
       border: 1px solid rgba(255, 106, 0, 0.12);
       transition: background 0.2s, border-color 0.2s;
+      cursor: pointer;
+      user-select: none;
     }
 
     .strike-row:hover {
       background: rgba(255, 106, 0, 0.1);
       border-color: rgba(255, 106, 0, 0.3);
+    }
+
+    .strike-item.open .strike-row {
+      border-radius: 6px 6px 0 0;
+      border-bottom-color: transparent;
+      background: rgba(255, 106, 0, 0.1);
     }
 
     .strike-meteor { font-size: 0.95rem; flex-shrink: 0; }
@@ -268,7 +277,69 @@
       text-shadow: none;
     }
 
+    .strike-chevron {
+      font-size: 0.6rem;
+      color: rgba(232, 213, 196, 0.3);
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+
+    .strike-item.open .strike-chevron { transform: rotate(180deg); }
+
     @keyframes blink { 50% { opacity: 0.25; } }
+
+    /* ── Strike detail panel ───────────────────────────────────────────────── */
+    .strike-detail {
+      display: none;
+      padding: 0.85rem 1rem 0.9rem;
+      background: rgba(10, 5, 18, 0.7);
+      border: 1px solid rgba(255, 106, 0, 0.12);
+      border-top: none;
+      border-radius: 0 0 6px 6px;
+    }
+
+    .strike-item.open .strike-detail { display: block; }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns: 5.5rem 1fr;
+      gap: 0.3rem 0.75rem;
+      margin-bottom: 0.55rem;
+      font-size: 0.75rem;
+      align-items: start;
+    }
+
+    .detail-row:last-child { margin-bottom: 0; }
+
+    .detail-key {
+      color: rgba(232, 213, 196, 0.38);
+      letter-spacing: 0.06em;
+      padding-top: 0.15rem;
+      text-transform: uppercase;
+      font-size: 0.65rem;
+    }
+
+    .detail-val { color: rgba(232, 213, 196, 0.75); word-break: break-all; }
+
+    .detail-val.action-name {
+      color: var(--glow);
+      font-weight: 700;
+      text-shadow: 0 0 8px rgba(255, 154, 60, 0.3);
+    }
+
+    .detail-val code {
+      display: block;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 106, 0, 0.15);
+      border-radius: 4px;
+      padding: 0.45rem 0.6rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.72rem;
+      color: #b0e0b0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.5;
+    }
 
     .no-strikes {
       font-size: 0.78rem;
@@ -426,6 +497,49 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── Strike detail builder ─────────────────────────────────────────────────────
+function buildDetail(s) {
+  const rows = [];
+
+  if (s.actionName) {
+    rows.push(`<div class="detail-row">
+      <span class="detail-key">Action</span>
+      <span class="detail-val action-name">${esc(s.actionName)}</span>
+    </div>`);
+  }
+
+  if (s.image) {
+    rows.push(`<div class="detail-row">
+      <span class="detail-key">Image</span>
+      <span class="detail-val">${esc(s.image)}</span>
+    </div>`);
+  }
+
+  if (s.command && s.command.length) {
+    // Inline args so the full invocation is shown as one block
+    const full = [...s.command, ...(s.args || [])].join(' ');
+    rows.push(`<div class="detail-row">
+      <span class="detail-key">Command</span>
+      <span class="detail-val"><code>${esc(full)}</code></span>
+    </div>`);
+  }
+
+  rows.push(`<div class="detail-row">
+    <span class="detail-key">CronJob</span>
+    <span class="detail-val">${esc(s.name)}</span>
+  </div>`);
+
+  rows.push(`<div class="detail-row">
+    <span class="detail-key">Fire time</span>
+    <span class="detail-val">${fmtAbs(s.fireTime)}</span>
+  </div>`);
+
+  return rows.join('');
+}
+
+// ── Expanded strike state (survives re-renders) ───────────────────────────────
+const expandedStrikes = new Set();
+
 // ── Render ────────────────────────────────────────────────────────────────────
 let kmData = [];
 
@@ -443,13 +557,20 @@ function renderCard(km) {
     : '';
 
   const strikeRows = strikes.length
-    ? strikes.map(s => `
-        <div class="strike-row" data-fire="${esc(s.fireTime)}">
-          <span class="strike-meteor">&#9732;</span>
-          <span class="strike-name" title="${esc(s.name)}">${esc(s.name)}</span>
-          <span class="strike-abs">${fmtAbs(s.fireTime)}</span>
-          <span class="strike-cd">…</span>
-        </div>`).join('')
+    ? strikes.map(s => {
+        const detail = buildDetail(s);
+        return `
+        <div class="strike-item" data-strike="${esc(s.name)}">
+          <div class="strike-row" data-fire="${esc(s.fireTime)}">
+            <span class="strike-meteor">&#9732;</span>
+            <span class="strike-name" title="${esc(s.name)}">${esc(s.name)}</span>
+            <span class="strike-abs">${fmtAbs(s.fireTime)}</span>
+            <span class="strike-cd">…</span>
+            <span class="strike-chevron">&#9660;</span>
+          </div>
+          <div class="strike-detail">${detail}</div>
+        </div>`;
+      }).join('')
     : '<div class="no-strikes">No strikes scheduled in this interval</div>';
 
   return `
@@ -481,6 +602,12 @@ function renderAll() {
     return;
   }
   root.innerHTML = `<div class="grid">${kmData.map(renderCard).join('')}</div>`;
+
+  // Restore expanded state after re-render
+  expandedStrikes.forEach(name => {
+    const el = root.querySelector(`.strike-item[data-strike="${CSS.escape(name)}"]`);
+    if (el) el.classList.add('open');
+  });
 }
 
 // ── Live countdowns ───────────────────────────────────────────────────────────
@@ -526,6 +653,21 @@ async function fetchData() {
       : root.innerHTML);
   }
 }
+
+// ── Click-to-expand strike rows ───────────────────────────────────────────────
+document.getElementById('root').addEventListener('click', function (e) {
+  const row = e.target.closest('.strike-row');
+  if (!row) return;
+  const item = row.closest('.strike-item');
+  if (!item) return;
+  const name = item.dataset.strike;
+  item.classList.toggle('open');
+  if (item.classList.contains('open')) {
+    expandedStrikes.add(name);
+  } else {
+    expandedStrikes.delete(name);
+  }
+});
 
 fetchData();
 setInterval(fetchData, 30000);  // refresh data every 30 s
