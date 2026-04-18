@@ -15,6 +15,7 @@ import (
 
 	kmeteoriov1alpha1 "github.com/toamto/kmeteor/api/v1alpha1"
 	"github.com/toamto/kmeteor/internal/controller"
+	"github.com/toamto/kmeteor/internal/webui"
 )
 
 var scheme = runtime.NewScheme()
@@ -29,12 +30,14 @@ func main() {
 	var (
 		metricsAddr           string
 		probeAddr             string
+		webUIAddr             string
 		enableLeaderElect     bool
 		jobServiceAccountName string
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "Address for the metrics endpoint.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "Address for health probes.")
+	flag.StringVar(&webUIAddr, "web-ui-addr", "", "Address for the web UI (e.g. :8082). Empty disables the UI.")
 	flag.BoolVar(&enableLeaderElect, "leader-elect", false, "Enable leader election for high availability.")
 	flag.StringVar(&jobServiceAccountName, "job-service-account-name", "kmeteor-job",
 		"ServiceAccount assigned to scheduled CronJobs; controls their RBAC independently of the operator.")
@@ -67,6 +70,14 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "KMeteor")
 		os.Exit(1)
+	}
+
+	if webUIAddr != "" {
+		if err := mgr.Add(webui.NewServer(mgr.GetClient(), webUIAddr)); err != nil {
+			setupLog.Error(err, "Unable to register web UI server")
+			os.Exit(1)
+		}
+		setupLog.Info("Web UI enabled", "addr", webUIAddr)
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

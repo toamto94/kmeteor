@@ -25,11 +25,19 @@ spec:
           args:
             - --job-service-account-name={{ .Values.jobServiceAccount.name }}
             - --leader-elect={{ .Values.leaderElection }}
+            {{- if .Values.webUI.enabled }}
+            - --web-ui-addr=:{{ .Values.webUI.port }}
+            {{- end }}
           ports:
             - name: metrics
               containerPort: 8080
             - name: health
               containerPort: 8081
+            {{- if .Values.webUI.enabled }}
+            - name: webui
+              containerPort: {{ .Values.webUI.port }}
+              protocol: TCP
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz

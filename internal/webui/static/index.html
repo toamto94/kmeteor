@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KMeteor — Chaos Strike Dashboard</title>
+  <style>
+    :root {
+      --fire:   #ff6a00;
+      --ember:  #ee0979;
+      --glow:   #ff9a3c;
+      --tail:   #ffe0b2;
+      --space:  #06060f;
+      --panel:  rgba(16, 8, 26, 0.88);
+      --border: rgba(255, 106, 0, 0.35);
+      --text:   #e8d5c4;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: radial-gradient(ellipse at 50% 0%, #140820 0%, var(--space) 70%);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Starfield ─────────────────────────────────────────────────────────── */
+    #starfield {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── Meteor streaks ────────────────────────────────────────────────────── */
+    .meteor {
+      position: fixed;
+      width: 2px;
+      border-radius: 999px;
+      pointer-events: none;
+      z-index: 1;
+      transform-origin: top center;
+      animation: streak linear forwards;
+    }
+
+    @keyframes streak {
+      0%   { opacity: 1; transform: rotate(var(--angle)) translateY(0); }
+      100% { opacity: 0; transform: rotate(var(--angle)) translateY(var(--dist)); }
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────────── */
+    .page {
+      position: relative;
+      z-index: 2;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────────── */
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 2.8rem;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      background: linear-gradient(120deg, var(--tail) 0%, var(--glow) 35%, var(--fire) 65%, var(--ember) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 24px rgba(255, 106, 0, 0.55));
+      animation: hdrpulse 4s ease-in-out infinite;
+    }
+
+    @keyframes hdrpulse {
+      0%, 100% { filter: drop-shadow(0 0 18px rgba(255, 106, 0, 0.5)); }
+      50%       { filter: drop-shadow(0 0 38px rgba(255, 154, 60, 0.9)); }
+    }
+
+    .subtitle {
+      margin-top: 0.4rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.3em;
+      color: rgba(232, 213, 196, 0.45);
+      text-transform: uppercase;
+    }
+
+    .last-refresh {
+      margin-top: 0.6rem;
+      font-size: 0.68rem;
+      color: rgba(232, 213, 196, 0.28);
+    }
+
+    /* ── Grid ──────────────────────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+      gap: 1.5rem;
+    }
+
+    /* ── Card ──────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.4rem 1.5rem 1.5rem;
+      backdrop-filter: blur(8px);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.03) inset,
+        0 4px 32px rgba(0,0,0,0.5),
+        0 0 24px rgba(255, 106, 0, 0.06);
+      transition: box-shadow 0.3s;
+    }
+
+    .card:hover {
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.05) inset,
+        0 4px 32px rgba(0,0,0,0.6),
+        0 0 36px rgba(255, 106, 0, 0.18);
+    }
+
+    /* card header */
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+      padding-bottom: 0.85rem;
+      border-bottom: 1px solid rgba(255, 106, 0, 0.2);
+    }
+
+    .cr-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--glow);
+      text-shadow: 0 0 12px rgba(255, 154, 60, 0.35);
+      letter-spacing: 0.04em;
+    }
+
+    .cr-ns {
+      margin-top: 0.25rem;
+      font-size: 0.7rem;
+      color: rgba(232, 213, 196, 0.4);
+      letter-spacing: 0.06em;
+    }
+
+    .badges {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      padding: 0.18rem 0.55rem;
+      border-radius: 4px;
+      background: rgba(255, 106, 0, 0.1);
+      border: 1px solid rgba(255, 106, 0, 0.28);
+      color: var(--glow);
+      white-space: nowrap;
+    }
+
+    /* reconcile row */
+    .reconcile {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin-bottom: 1rem;
+      padding: 0.55rem 0.8rem;
+      border-radius: 6px;
+      background: rgba(238, 9, 121, 0.07);
+      border: 1px solid rgba(238, 9, 121, 0.22);
+    }
+
+    .reconcile-icon { font-size: 0.9rem; }
+
+    .reconcile-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(238, 9, 121, 0.85);
+      white-space: nowrap;
+    }
+
+    .reconcile-cd {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #ff69b4;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 8px rgba(238, 9, 121, 0.4);
+    }
+
+    /* strikes section */
+    .strikes-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(232, 213, 196, 0.32);
+      margin-bottom: 0.55rem;
+    }
+
+    .strike-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.35rem;
+      border-radius: 6px;
+      background: rgba(255, 106, 0, 0.05);
+      border: 1px solid rgba(255, 106, 0, 0.12);
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .strike-row:hover {
+      background: rgba(255, 106, 0, 0.1);
+      border-color: rgba(255, 106, 0, 0.3);
+    }
+
+    .strike-meteor { font-size: 0.95rem; flex-shrink: 0; }
+
+    .strike-name {
+      flex: 1;
+      font-size: 0.7rem;
+      color: rgba(232, 213, 196, 0.5);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .strike-abs {
+      font-size: 0.65rem;
+      color: rgba(232, 213, 196, 0.28);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .strike-cd {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--glow);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 8px rgba(255, 154, 60, 0.35);
+      white-space: nowrap;
+      flex-shrink: 0;
+      min-width: 7ch;
+      text-align: right;
+    }
+
+    .strike-cd.imminent {
+      color: var(--ember);
+      text-shadow: 0 0 14px rgba(238, 9, 121, 0.7);
+      animation: blink 0.7s step-end infinite;
+    }
+
+    .strike-cd.past {
+      color: rgba(232, 213, 196, 0.3);
+      font-size: 0.72rem;
+      text-shadow: none;
+    }
+
+    @keyframes blink { 50% { opacity: 0.25; } }
+
+    .no-strikes {
+      font-size: 0.78rem;
+      color: rgba(232, 213, 196, 0.28);
+      font-style: italic;
+      padding: 0.4rem 0.5rem;
+    }
+
+    /* ── Empty / loading / error states ───────────────────────────────────── */
+    .center-msg {
+      text-align: center;
+      padding: 5rem 2rem;
+      color: rgba(232, 213, 196, 0.35);
+    }
+
+    .center-msg .big { font-size: 1.6rem; margin-bottom: 0.5rem; }
+
+    .loading-dot {
+      display: inline-block;
+      animation: ldot 1.4s ease-in-out infinite;
+    }
+    .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes ldot {
+      0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+      40%            { opacity: 1;   transform: scale(1.2); }
+    }
+
+    .error-bar {
+      background: rgba(238, 9, 121, 0.09);
+      border: 1px solid rgba(238, 9, 121, 0.35);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.5rem;
+      color: #ff69b4;
+      font-size: 0.82rem;
+    }
+  </style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+
+<div class="page">
+  <header>
+    <div class="logo">&#9732; KMeteor</div>
+    <p class="subtitle">Chaos Strike Dashboard</p>
+    <p class="last-refresh" id="refreshLabel"></p>
+  </header>
+
+  <div id="root">
+    <div class="center-msg">
+      <div class="big">
+        <span class="loading-dot">&#9679;</span>
+        <span class="loading-dot">&#9679;</span>
+        <span class="loading-dot">&#9679;</span>
+      </div>
+      <p>Scanning for incoming meteors&hellip;</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Starfield ─────────────────────────────────────────────────────────────────
+(function () {
+  const cv = document.getElementById('starfield');
+  const cx = cv.getContext('2d');
+  let stars = [];
+
+  function resize() {
+    cv.width  = window.innerWidth;
+    cv.height = window.innerHeight;
+    stars = Array.from({ length: 220 }, () => ({
+      x:  Math.random() * cv.width,
+      y:  Math.random() * cv.height,
+      r:  Math.random() * 1.4 + 0.2,
+      a:  Math.random(),
+      da: (Math.random() * 0.006 + 0.001) * (Math.random() < 0.5 ? 1 : -1),
+    }));
+  }
+
+  function draw() {
+    cx.clearRect(0, 0, cv.width, cv.height);
+    stars.forEach(s => {
+      s.a = Math.max(0.05, Math.min(1, s.a + s.da));
+      if (s.a <= 0.05 || s.a >= 1) s.da = -s.da;
+      cx.beginPath();
+      cx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      cx.fillStyle = `rgba(210, 220, 255, ${s.a})`;
+      cx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
+})();
+
+// ── Meteor streaks ────────────────────────────────────────────────────────────
+(function () {
+  const COLORS = ['#ff9a3c', '#ff6a00', '#ffe0b2', '#ff69b4'];
+
+  function spawn() {
+    const el  = document.createElement('div');
+    el.className = 'meteor';
+    const len = 60 + Math.random() * 100;
+    const dur = 0.5 + Math.random() * 1.0;
+    const ang = 120 + Math.random() * 30;          // ~135° diagonal
+    const col = COLORS[Math.floor(Math.random() * COLORS.length)];
+    el.style.cssText = [
+      `top:${Math.random() * 70}vh`,
+      `left:${Math.random() * 90}vw`,
+      `height:${len}px`,
+      `background:linear-gradient(to bottom,transparent,${col})`,
+      `box-shadow:0 0 4px ${col}`,
+      `--angle:${ang}deg`,
+      `--dist:${Math.max(window.innerWidth, window.innerHeight) * 1.5}px`,
+      `animation-duration:${dur}s`,
+    ].join(';');
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), dur * 1000 + 50);
+  }
+
+  (function tick() {
+    spawn();
+    setTimeout(tick, 600 + Math.random() * 2800);
+  })();
+})();
+
+// ── Time helpers ──────────────────────────────────────────────────────────────
+function fmtCountdown(ms) {
+  if (ms <= 0) return null;
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  if (d > 0)  return d + 'd ' + (h % 24) + 'h ' + (m % 60) + 'm';
+  if (h > 0)  return h + 'h ' + (m % 60) + 'm ' + (s % 60) + 's';
+  if (m > 0)  return m + 'm ' + (s % 60) + 's';
+  return s + 's';
+}
+
+function fmtAbs(iso) {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+    timeZoneName: 'short',
+  });
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+let kmData = [];
+
+function renderCard(km) {
+  const strikes = (km.strikes || [])
+    .slice()
+    .sort((a, b) => new Date(a.fireTime) - new Date(b.fireTime));
+
+  const reconcileHtml = km.reconcileAt
+    ? `<div class="reconcile">
+        <span class="reconcile-icon">&#9850;</span>
+        <span class="reconcile-label">Next Reconcile</span>
+        <span class="reconcile-cd" data-at="${esc(km.reconcileAt)}">…</span>
+      </div>`
+    : '';
+
+  const strikeRows = strikes.length
+    ? strikes.map(s => `
+        <div class="strike-row" data-fire="${esc(s.fireTime)}">
+          <span class="strike-meteor">&#9732;</span>
+          <span class="strike-name" title="${esc(s.name)}">${esc(s.name)}</span>
+          <span class="strike-abs">${fmtAbs(s.fireTime)}</span>
+          <span class="strike-cd">…</span>
+        </div>`).join('')
+    : '<div class="no-strikes">No strikes scheduled in this interval</div>';
+
+  return `
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="cr-name">${esc(km.name)}</div>
+          <div class="cr-ns">ns:&nbsp;${esc(km.namespace)}</div>
+        </div>
+        <div class="badges">
+          <span class="badge">&lambda;&nbsp;${km.lambda}</span>
+          <span class="badge">${esc(km.interval)}</span>
+        </div>
+      </div>
+      ${reconcileHtml}
+      <div class="strikes-label">Upcoming Strikes (${strikes.length})</div>
+      ${strikeRows}
+    </div>`;
+}
+
+function renderAll() {
+  const root = document.getElementById('root');
+  if (!kmData || !kmData.length) {
+    root.innerHTML = `
+      <div class="center-msg">
+        <div class="big">&#9732;</div>
+        <p>No KMeteor CRs found.<br>Deploy a KMeteor CR to start scheduling chaos strikes.</p>
+      </div>`;
+    return;
+  }
+  root.innerHTML = `<div class="grid">${kmData.map(renderCard).join('')}</div>`;
+}
+
+// ── Live countdowns ───────────────────────────────────────────────────────────
+function tick() {
+  const now = Date.now();
+
+  document.querySelectorAll('.strike-row[data-fire]').forEach(row => {
+    const ms  = new Date(row.dataset.fire).getTime() - now;
+    const cd  = row.querySelector('.strike-cd');
+    if (!cd) return;
+    const label = fmtCountdown(ms);
+    if (label === null) {
+      cd.textContent = 'IMPACT';
+      cd.className = 'strike-cd past';
+    } else {
+      cd.textContent = label;
+      cd.className = 'strike-cd' + (ms < 60000 ? ' imminent' : '');
+    }
+  });
+
+  document.querySelectorAll('.reconcile-cd[data-at]').forEach(el => {
+    const ms    = new Date(el.dataset.at).getTime() - now;
+    const label = fmtCountdown(ms);
+    el.textContent = label !== null ? label : 'overdue';
+  });
+}
+
+// ── Fetch & refresh ───────────────────────────────────────────────────────────
+async function fetchData() {
+  try {
+    const resp = await fetch('/api/strikes');
+    if (!resp.ok) throw new Error(resp.status + ' ' + resp.statusText);
+    kmData = await resp.json();
+    renderAll();
+    document.getElementById('refreshLabel').textContent =
+      'Last updated: ' + new Date().toLocaleTimeString();
+  } catch (err) {
+    const root = document.getElementById('root');
+    const bar  = `<div class="error-bar">&#9888; Failed to fetch data: ${esc(err.message)}</div>`;
+    // Prepend error banner but keep existing cards visible
+    root.innerHTML = bar + (root.innerHTML.startsWith('<div class="error-bar"')
+      ? root.innerHTML.replace(/^<div class="error-bar"[^>]*>.*?<\/div>/, '')
+      : root.innerHTML);
+  }
+}
+
+fetchData();
+setInterval(fetchData, 30000);  // refresh data every 30 s
+setInterval(tick, 1000);        // update countdowns every second
+tick();
+</script>
+</body>
+</html>

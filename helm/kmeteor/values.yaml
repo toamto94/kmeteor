@@ -153,6 +153,24 @@ jobRbac:
 tenantAccess:
   enabled: false
 
+# ── Web UI ──────────────────────────────────────────────────────────────────
+# Optional dashboard served by the operator that shows live countdowns for
+# all upcoming meteor strikes and the next reconciliation per KMeteor CR.
+# Set enabled: true to activate; the operator exposes the UI on the chosen
+# port and a Service is created to reach it inside the cluster.
+webUI:
+  enabled: false
+  port: 8082
+  service:
+    type: ClusterIP
+  # Optionally expose the UI outside the cluster via an Ingress.
+  ingress:
+    enabled: false
+    # className: nginx
+    # host: kmeteor.example.com
+    # annotations: {}
+    # tls: []
+
 leaderElection: false
 
 resources:

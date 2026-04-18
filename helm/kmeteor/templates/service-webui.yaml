@@ -1,0 +1,53 @@
+{{- if .Values.webUI.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kmeteor.fullname" . }}-webui
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kmeteor.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.webUI.service.type }}
+  selector:
+    {{- include "kmeteor.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: webui
+      port: {{ .Values.webUI.port }}
+      targetPort: webui
+      protocol: TCP
+---
+{{- if .Values.webUI.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "kmeteor.fullname" . }}-webui
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kmeteor.labels" . | nindent 4 }}
+  {{- with .Values.webUI.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.webUI.ingress.className }}
+  ingressClassName: {{ .Values.webUI.ingress.className }}
+  {{- end }}
+  {{- with .Values.webUI.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - {{- if .Values.webUI.ingress.host }}
+      host: {{ .Values.webUI.ingress.host }}
+      {{- end }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "kmeteor.fullname" . }}-webui
+                port:
+                  name: webui
+{{- end }}
+{{- end }}
